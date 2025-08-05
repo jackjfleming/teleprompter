@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teleprompter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for a cleaner look */
+        #script-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #script-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        #script-container::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+        #script-container::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        textarea:focus {
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.5);
+            border-color: #60a5fa;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col h-screen overflow-hidden">
+
+    <!-- Setup Screen -->
+    <div id="setup-screen" class="flex flex-col items-center justify-center h-full p-6">
+        <div class="w-full max-w-3xl text-center">
+            <h1 class="text-4xl font-bold mb-4">Teleprompter Script Input</h1>
+            <p class="text-gray-400 mb-8">Paste your script below. Each new line will be treated as a new paragraph.</p>
+            <textarea id="script-input" class="w-full h-64 p-4 bg-gray-800 border-2 border-gray-700 rounded-lg text-white resize-none focus:outline-none transition-shadow" placeholder="Start typing or paste your script here..."></textarea>
+            <button id="start-btn" class="mt-6 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg text-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400">Start Teleprompter</button>
+        </div>
+    </div>
+
+    <!-- Teleprompter Screen (Initially Hidden) -->
+    <div id="teleprompter-screen" class="hidden flex flex-col h-full">
+        <!-- Header / Title -->
+        <header class="bg-gray-800/50 backdrop-blur-sm shadow-lg p-4 text-center z-20 border-b border-gray-700">
+            <h1 class="text-2xl font-bold tracking-wider">Project Update Teleprompter</h1>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-grow flex flex-col md:flex-row overflow-hidden">
+
+            <!-- Script Display -->
+            <div id="script-container" class="flex-grow p-8 md:p-12 lg:p-16 overflow-y-auto bg-gray-900">
+                <div id="script-content" class="max-w-4xl mx-auto text-2xl leading-relaxed md:text-3xl md:leading-loose lg:text-4xl lg:leading-loose transition-all duration-300">
+                    <!-- Script will be injected here by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Controls Panel -->
+            <aside class="w-full md:w-64 lg:w-72 bg-gray-800 p-6 flex flex-col gap-6 z-10 border-t md:border-t-0 md:border-l border-gray-700 shadow-2xl">
+                <h2 class="text-xl font-semibold text-center border-b border-gray-600 pb-3">Controls</h2>
+                
+                <div class="grid grid-cols-3 gap-3">
+                    <button id="play-pause" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400">Play</button>
+                    <button id="reset" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400">Reset</button>
+                </div>
+
+                <div>
+                    <label for="speed" class="block mb-2 text-sm font-medium text-gray-300">Speed: <span id="speed-value">5</span></label>
+                    <input id="speed" type="range" min="1" max="20" value="5" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+
+                <div>
+                    <label for="font-size" class="block mb-2 text-sm font-medium text-gray-300">Font Size: <span id="font-size-value">36</span>px</label>
+                    <input id="font-size" type="range" min="16" max="72" value="36" step="2" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+                
+                <div>
+                    <label class="flex items-center justify-between cursor-pointer">
+                        <span class="text-sm font-medium text-gray-300">Focus Guide</span>
+                        <div class="relative">
+                            <input type="checkbox" id="guide-toggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="border-t border-gray-600 pt-4">
+                     <button id="new-script-btn" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-400">New Script</button>
+                </div>
+
+            </aside>
+        </main>
+        
+        <div id="focus-guide" class="hidden absolute left-0 w-full h-1 bg-red-500/70 backdrop-blur-sm" style="top: 50%;"></div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- SCREENS ---
+            const setupScreen = document.getElementById('setup-screen');
+            const teleprompterScreen = document.getElementById('teleprompter-screen');
+
+            // --- SETUP ELEMENTS ---
+            const scriptInput = document.getElementById('script-input');
+            const startBtn = document.getElementById('start-btn');
+            
+            // --- TELEPROMPTER ELEMENTS ---
+            const scriptContainer = document.getElementById('script-container');
+            const scriptContent = document.getElementById('script-content');
+            const playPauseBtn = document.getElementById('play-pause');
+            const resetBtn = document.getElementById('reset');
+            const speedSlider = document.getElementById('speed');
+            const speedValueDisplay = document.getElementById('speed-value');
+            const fontSizeSlider = document.getElementById('font-size');
+            const fontSizeValueDisplay = document.getElementById('font-size-value');
+            const guideToggle = document.getElementById('guide-toggle');
+            const focusGuide = document.getElementById('focus-guide');
+            const newScriptBtn = document.getElementById('new-script-btn');
+
+            // --- STATE ---
+            let isPlaying = false;
+            let animationFrameId = null;
+            let currentSpeed = parseInt(speedSlider.value, 10);
+            let currentFontSize = parseInt(fontSizeSlider.value, 10);
+
+            // --- FUNCTIONS ---
+            
+            function startTeleprompter() {
+                const rawText = scriptInput.value;
+                if (rawText.trim() === "") {
+                    alert("Please enter a script before starting.");
+                    return;
+                }
+                
+                // Format text: replace newlines with double <br> for paragraph breaks
+                const formattedScript = rawText.trim().replace(/\n/g, '<br><br>');
+                scriptContent.innerHTML = formattedScript;
+
+                // Switch screens
+                setupScreen.classList.add('hidden');
+                teleprompterScreen.classList.remove('hidden');
+                teleprompterScreen.classList.add('flex');
+            }
+
+            function showSetupScreen() {
+                resetTeleprompter(); // Stop and reset scroll
+                teleprompterScreen.classList.add('hidden');
+                teleprompterScreen.classList.remove('flex');
+                setupScreen.classList.remove('hidden');
+            }
+
+            function scroll() {
+                if (!isPlaying) return;
+                scriptContainer.scrollTop += currentSpeed * 0.1;
+                animationFrameId = requestAnimationFrame(scroll);
+            }
+
+            function togglePlayPause() {
+                isPlaying = !isPlaying;
+                if (isPlaying) {
+                    playPauseBtn.textContent = 'Pause';
+                    playPauseBtn.classList.remove('bg-blue-600', 'hover:bg-blue-500');
+                    playPauseBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-400');
+                    scroll();
+                } else {
+                    playPauseBtn.textContent = 'Play';
+                    playPauseBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-400');
+                    playPauseBtn.classList.add('bg-blue-600', 'hover:bg-blue-500');
+                    cancelAnimationFrame(animationFrameId);
+                }
+            }
+
+            function resetTeleprompter() {
+                if (isPlaying) {
+                   togglePlayPause(); // Pause the prompter if it's running
+                }
+                scriptContainer.scrollTop = 0;
+            }
+
+            function updateSpeed(e) {
+                currentSpeed = parseInt(e.target.value, 10);
+                speedValueDisplay.textContent = currentSpeed;
+            }
+
+            function updateFontSize(e) {
+                currentFontSize = parseInt(e.target.value, 10);
+                scriptContent.style.fontSize = `${currentFontSize}px`;
+                fontSizeValueDisplay.textContent = currentFontSize;
+            }
+            
+            function toggleGuide() {
+                focusGuide.classList.toggle('hidden');
+            }
+
+            // --- EVENT LISTENERS ---
+            startBtn.addEventListener('click', startTeleprompter);
+            newScriptBtn.addEventListener('click', showSetupScreen);
+            playPauseBtn.addEventListener('click', togglePlayPause);
+            resetBtn.addEventListener('click', resetTeleprompter);
+            speedSlider.addEventListener('input', updateSpeed);
+            fontSizeSlider.addEventListener('input', updateFontSize);
+            guideToggle.addEventListener('change', toggleGuide);
+            
+            document.addEventListener('keydown', (e) => {
+                // Only apply shortcuts if the teleprompter is visible
+                if (teleprompterScreen.classList.contains('hidden')) return;
+
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    togglePlayPause();
+                }
+                if (e.code === 'Escape') {
+                    resetTeleprompter();
+                }
+            });
+
+            // --- INITIALIZATION ---
+            speedValueDisplay.textContent = speedSlider.value;
+            fontSizeValueDisplay.textContent = fontSizeSlider.value;
+            scriptContent.style.fontSize = `${fontSizeSlider.value}px`;
+        });
+    </script>
+</body>
+</html>
